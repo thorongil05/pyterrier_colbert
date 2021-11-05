@@ -23,6 +23,7 @@ class InfoPruning:
         }
         self.pruning_counter += 1
         if(self.pruning_counter == self.topics_len * self.n_docs):
+            print(f'Reached {self.pruning_counter}. Add a new dataframe.')
             self.pruning_dataframes.append(self._get_pruning_info())
             self.pruning_info = {}
             self.pruning_counter = 0
