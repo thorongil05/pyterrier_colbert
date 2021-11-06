@@ -141,12 +141,13 @@ def fetch_index_encodings(factory, verbose=False, ids=False) -> TransformerBase:
     output: ditto + doc_embs [+ doc_toks]
     """
     def _get_embs(df):
+        rrm = factory._rrm() # _rrm() instead of rrm because we need to check it has already been loaded.
         if verbose:
             import pyterrier as pt
             pt.tqdm.pandas()
-            df["doc_embs"] = df.docid.progress_apply(factory.rrm.get_embedding)
+            df["doc_embs"] = df.docid.progress_apply(rrm.get_embedding) 
         else:
-            df["doc_embs"] = df.docid.apply(factory.rrm.get_embedding)
+            df["doc_embs"] = df.docid.apply(rrm.get_embedding)
         return df
 
     def _get_tok_ids(df):
@@ -184,11 +185,11 @@ def pca_transformer(factory, pca, verbose=False) -> TransformerBase:
     
     return pt.apply.by_query(_apply_pca, add_ranks=False)
 
-def scorer(factory, verbose=False) -> TransformerBase:
+def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
         """
         Calculates the ColBERT max_sim operator using previous encodings of queries and documents
         input: qid, query_embs, [query_weights], docno, doc_embs
-        output: ditto + score
+        output: ditto + score, [+ contributions]
         """
         import torch
         colbert = factory.args.colbert
@@ -211,6 +212,10 @@ def scorer(factory, verbose=False) -> TransformerBase:
             scores = (weightsQ*maxscoreQ).sum(1).cpu()
             df["score"] = scores.tolist()
             df = factory._add_docnos(df)
+
+            if add_contributions:
+                contributions = (Q @ D.permute(0, 2, 1)).max(1).values.cpu()
+                df["contributions"] = contributions.tolist()
             return df
             
         return pt.apply.by_query(_score_query)

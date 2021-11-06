@@ -11,18 +11,33 @@ class InfoPruning:
         self.pruning_info = {}
         self.pruning_dataframes = []
         self.pruning_counter = 0
-        self.topics_len = 0
+        self.topics_len = None
+        self.qrels_len = None
         self.n_docs = 0
 
+    def set_topics_len(self, value : int):
+        if value > 0:
+            self.topics_len = value
+        else: 
+            raise 'the length must be positive'
+
+    def set_qrels_len(self, value : int):
+        if value > 0:
+            self.qrels_len = value
+        else: 
+            raise 'the length must be positive'
+
     def add_pruning_info(self, query_id, doc_id, doc_len, embeddings_pruned):
+        assert not self.topics_len == None, "Use .set_topics_len(value) to add the number of topics"
+        assert not self.qrels_len == None, "Use .set_qrel_len(value) to add the number of topics"
         self.pruning_info[query_id] = {
             doc_id: {
                 'doc_len': doc_len, 
                 'embeddings_pruned': embeddings_pruned
             }
         }
-        self.pruning_counter += 1
-        if(self.pruning_counter == self.topics_len * self.n_docs):
+        self.pruning_counter += 1  
+        if(self.pruning_counter == min(self.topics_len, self.qrels_len) * self.n_docs):
             self.pruning_dataframes.append(self._get_pruning_info())
             self.pruning_info = {}
             self.pruning_counter = 0
