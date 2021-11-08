@@ -191,6 +191,11 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
         input: qid, query_embs, [query_weights], docno, doc_embs
         output: ditto + score, [+ contributions]
         """
+        def _build_interaction(row, D):
+            doc_embs = row.doc_embs
+            doc_len = doc_embs.shape[0]
+            D[row.row_index, 0:doc_len, :] = doc_embs
+        
         import torch
         colbert = factory.args.colbert
         def _score_query(df):
@@ -201,18 +206,12 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             else:
                 weightsQ = torch.ones(Q.shape[0])        
             D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim)
-            iter = range(len(df))
-            if verbose:
-                iter = pt.tqdm(iter, total=len(df))
-            for i in iter:
-                doc_embs = df.iloc[i].doc_embs
-                doclen = doc_embs.shape[0]
-                D[i, 0:doclen, :] =  doc_embs
+            df['row_index'] = range(len(df))
+            df.apply(lambda row: _build_interaction(row, D), axis=1)
             maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values.cpu()
             scores = (weightsQ*maxscoreQ).sum(1).cpu()
             df["score"] = scores.tolist()
             df = factory._add_docnos(df)
-
             if add_contributions:
                 contributions = (Q @ D.permute(0, 2, 1)).max(1).values.cpu()
                 df["contributions"] = contributions.tolist()
@@ -258,7 +257,21 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
         pruned_embeddings_percentage = pruned_embeddings/row_embs_size[0]
         if verbose:
             print(f'Embeddings removed from document {docid:10.0f}: {pruned_embeddings:10.0f} \t ({pruned_embeddings_percentage:10.2%})', end='\r')
-        factory.pruning_info.add_pruning_info(qid, docid, row_embs_size[0], pruned_embeddings, verbose) 
+        factory.pruning_info.add_pruning_info(qid, docid, row_embs_size[0], pruned_embeddings) 
         return row
 
     return pt.apply.generic(lambda df : df.apply(_prune, axis=1))
+
+def timer(T: TransformerBase, message) -> TransformerBase:
+    """
+    Timer
+    """
+    def _apply(_input):
+        import time
+        start_time = time.time()
+        res = T.transform(_input)
+        time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+        print(f"Time elapsed for {message} -> {time_elapsed}")
+        return res
+
+    return pt.apply.generic(_apply)

@@ -282,6 +282,9 @@ class ColBERTFactory():
         self.pruning_info = InfoPruning()
 
     # pruning
+    def get_pruning_info(self):
+        return self.pruning_info
+        
     def refresh_pruning_info(self):
         self.pruning_info = InfoPruning()
         
