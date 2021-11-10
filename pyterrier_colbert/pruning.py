@@ -212,9 +212,9 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim)
             df['row_index'] = range(len(df))
             if verbose:
-                df.apply(lambda row: _build_interaction(row, D), axis=1)
-            else:
                 df.perform_apply(lambda row: _build_interaction(row, D), axis=1)
+            else:
+                df.apply(lambda row: _build_interaction(row, D), axis=1)
             maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values.cpu()
             scores = (weightsQ*maxscoreQ).sum(1).cpu()
             df["score"] = scores.tolist()
