@@ -239,8 +239,8 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
     The blacklist parameters must contain a list of tokenids that should be removed
     """
 
-    assert pt.started(), 'PyTerrier must be started'
     import pyterrier as pt
+    assert pt.started(), 'PyTerrier must be started'
     pt.tqdm.pandas()
 
     if verbose: print(f'Blacklist composed of {len(blacklist)} elements.')
