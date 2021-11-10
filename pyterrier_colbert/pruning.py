@@ -178,8 +178,12 @@ def pca_transformer(factory, pca, verbose=False) -> TransformerBase:
     import torch
     def _apply_pca(df):
         # TODO: add verbose progress bar
-        df["doc_embs"] = df["doc_embs"].map(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
-        df["query_embs"] = df["query_embs"].map(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
+        if verbose:
+            df["doc_embs"] = df.doc_embs.progress_apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
+            df["query_embs"] = df.query_embs.progress_apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
+        else:
+            df["doc_embs"] = df.doc_embs.apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
+            df["query_embs"] = df.query_embs.apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
         factory.args.dim = pca.n_components
         return df
     
@@ -212,7 +216,7 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim)
             df['row_index'] = range(len(df))
             if verbose:
-                df.perform_apply(lambda row: _build_interaction(row, D), axis=1)
+                df.progress_apply(lambda row: _build_interaction(row, D), axis=1)
             else:
                 df.apply(lambda row: _build_interaction(row, D), axis=1)
             maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values.cpu()
@@ -273,7 +277,7 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
 
     def _apply(df):
         if verbose:
-            df.perform_apply(_prune, axis=1)
+            df.progress_apply(_prune, axis=1)
         else:
             df.apply(_prune, axis=1)
         return df
