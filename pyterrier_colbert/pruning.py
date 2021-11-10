@@ -177,7 +177,7 @@ def pca_transformer(factory, pca, verbose=False) -> TransformerBase:
     """
     import torch
     def _apply_pca(df):
-        iter = range(len(df))
+        # TODO: add verbose progress bar
         df["doc_embs"] = df["doc_embs"].map(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
         df["query_embs"] = df["query_embs"].map(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
         factory.args.dim = pca.n_components
@@ -191,13 +191,17 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
         input: qid, query_embs, [query_weights], docno, doc_embs
         output: ditto + score, [+ contributions]
         """
+        import torch
+        import pyterrier as pt
+        assert pt.started(), 'PyTerrier must be started'
+        pt.tqdm.pandas()
+        colbert = factory.args.colbert
+
         def _build_interaction(row, D):
             doc_embs = row.doc_embs
             doc_len = doc_embs.shape[0]
             D[row.row_index, 0:doc_len, :] = doc_embs
         
-        import torch
-        colbert = factory.args.colbert
         def _score_query(df):
             weightsQ = None
             Q = torch.cat([df.iloc[0].query_embs])
@@ -207,7 +211,10 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
                 weightsQ = torch.ones(Q.shape[0])        
             D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim)
             df['row_index'] = range(len(df))
-            df.apply(lambda row: _build_interaction(row, D), axis=1)
+            if verbose:
+                df.apply(lambda row: _build_interaction(row, D), axis=1)
+            else:
+                df.perform_apply(lambda row: _build_interaction(row, D), axis=1)
             maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values.cpu()
             scores = (weightsQ*maxscoreQ).sum(1).cpu()
             df["score"] = scores.tolist()
@@ -227,6 +234,10 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
     
     The blacklist parameters must contain a list of tokenids that should be removed
     """
+
+    assert pt.started(), 'PyTerrier must be started'
+    import pyterrier as pt
+    pt.tqdm.pandas()
 
     if verbose: print(f'Blacklist composed of {len(blacklist)} elements.')
     
@@ -254,13 +265,20 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
         row['doc_toks'] = tokens[final_mask]
 
         pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
-        pruned_embeddings_percentage = pruned_embeddings/row_embs_size[0]
-        if verbose:
-            print(f'Embeddings removed from document {docid:10.0f}: {pruned_embeddings:10.0f} \t ({pruned_embeddings_percentage:10.2%})', end='\r')
+        #if verbose:
+        #    pruned_embeddings_percentage = pruned_embeddings/row_embs_size[0]
+        #    print(f'Embeddings removed from document {docid:10.0f}: {pruned_embeddings:10.0f} \t ({pruned_embeddings_percentage:10.2%})', end='\r')
         factory.pruning_info.add_pruning_info(qid, docid, row_embs_size[0], pruned_embeddings) 
         return row
 
-    return pt.apply.generic(lambda df : df.apply(_prune, axis=1))
+    def _apply(df):
+        if verbose:
+            df.perform_apply(_prune, axis=1)
+        else:
+            df.apply(_prune, axis=1)
+        return df
+
+    return pt.apply.generic(_apply)
 
 def timer(T: TransformerBase, message) -> TransformerBase:
     """
