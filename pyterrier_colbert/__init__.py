@@ -1,4 +1,6 @@
+import pyterrier as pt
 
+assert pt.started(), 'PyTerrier must be started to use Colbert plugin'
 #import importlib
 #ranking = importlib.import_module('.' + 'indexing', package='pyterrier_colbert') 
 #ranking = importlib.import_module('.' + 'ranking', package='pyterrier_colbert')

@@ -11,36 +11,20 @@ class InfoPruning:
         self.pruning_info = {}
         self.pruning_dataframes = []
         self.pruning_counter = 0
-        self.topics_len = None
-        self.qrels_len = None
         self.n_docs = 0
 
-    def set_topics_len(self, value : int):
-        if value > 0:
-            self.topics_len = value
-        else: 
-            raise 'the length must be positive'
 
-    def set_qrels_len(self, value : int):
-        if value > 0:
-            self.qrels_len = value
-        else: 
-            raise 'the length must be positive'
-
-    def add_pruning_info(self, query_id, doc_id, doc_len, embeddings_pruned):
-        assert not self.topics_len == None, "Use .set_topics_len(value) to add the number of topics"
-        assert not self.qrels_len == None, "Use .set_qrel_len(value) to add the number of topics"
+    def add(self, query_id, doc_id, doc_len, embeddings_pruned):
         self.pruning_info[query_id] = {
             doc_id: {
                 'doc_len': doc_len, 
                 'embeddings_pruned': embeddings_pruned
             }
         }
-        self.pruning_counter += 1  
-        if(self.pruning_counter == min(self.topics_len, self.qrels_len) * self.n_docs):
-            self.pruning_dataframes.append(self._get_pruning_info())
-            self.pruning_info = {}
-            self.pruning_counter = 0
+
+    def persist(self):    
+        self.pruning_dataframes.append(self._get_pruning_info())
+        self.pruning_info = {}
     
     def get_overall_df(self, names=[]):
         if len(names) != len(self.pruning_dataframes):
@@ -121,3 +105,4 @@ class InfoPruning:
         max_pruned_str = f'{max_pruned[0]:4} ({max_pruned[1]:4.2%})'
         min_pruned_str = f'{min_pruned[0]:4} ({min_pruned[1]:4.2%})'
         return [query_id, total_embeddings, total_prunings, overall_percentage, max_pruned_str, min_pruned_str]
+

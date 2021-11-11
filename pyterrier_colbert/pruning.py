@@ -1,6 +1,8 @@
 import pandas as pd
 import pyterrier as pt
 from pyterrier.transformer import TransformerBase
+
+from pyterrier_colbert.info_pruning import InfoPruning
 from .ranking import ColBERTFactory
 
 def _filter_query(query_toks_df : pd.DataFrame) -> pd.DataFrame:
@@ -230,7 +232,7 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             
         return pt.apply.by_query(_score_query)
 
-def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> TransformerBase:
+def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=None, verbose=False) -> TransformerBase:
     """
     Remove tokens and their embeddings from the document dataframe
     input: qid, query_embs, docno, doc_embs, doc_toks
@@ -269,17 +271,15 @@ def blacklisted_tokens_transformer(factory, blacklist, verbose=False) -> Transfo
         row['doc_toks'] = tokens[final_mask]
 
         pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
-        #if verbose:
-        #    pruned_embeddings_percentage = pruned_embeddings/row_embs_size[0]
-        #    print(f'Embeddings removed from document {docid:10.0f}: {pruned_embeddings:10.0f} \t ({pruned_embeddings_percentage:10.2%})', end='\r')
-        factory.pruning_info.add_pruning_info(qid, docid, row_embs_size[0], pruned_embeddings) 
+        if not pruningInfo is None: pruningInfo.add(qid, docid, row_embs_size[0], pruned_embeddings) 
         return row
 
     def _apply(df):
         if verbose:
-            df.progress_apply(_prune, axis=1)
+            df = df.progress_apply(_prune, axis=1)
         else:
-            df.apply(_prune, axis=1)
+            df = df.apply(_prune, axis=1)
+        if not pruningInfo is None: factory.get_pruning_info().persist()
         return df
 
     return pt.apply.generic(_apply)

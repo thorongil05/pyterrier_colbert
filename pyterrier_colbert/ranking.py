@@ -278,16 +278,6 @@ class ColBERTFactory():
         self.rrm = None
         self.faiss_index = None
 
-        #pruning field
-        self.pruning_info = InfoPruning()
-
-    # pruning
-    def get_pruning_info(self):
-        return self.pruning_info
-        
-    def refresh_pruning_info(self):
-        self.pruning_info = InfoPruning()
-        
     # allows a colbert index to be built from a dataset
     def from_dataset(dataset : Union[str,Dataset], 
             variant : str = None, 
