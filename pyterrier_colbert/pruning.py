@@ -279,7 +279,7 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
             df = df.progress_apply(_prune, axis=1)
         else:
             df = df.apply(_prune, axis=1)
-        if not pruningInfo is None: factory.get_pruning_info().persist()
+        if not pruningInfo is None: pruningInfo.persist()
         return df
 
     return pt.apply.generic(_apply)
