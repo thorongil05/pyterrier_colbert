@@ -15,43 +15,18 @@ class InfoPruning:
 
 
     def add(self, query_id, doc_id, doc_len, embeddings_pruned):
-        self.pruning_info[query_id] = {
-            doc_id: {
-                'doc_len': doc_len, 
-                'embeddings_pruned': embeddings_pruned
-            }
+        self.pruning_info[hash((query_id, doc_id))] = {
+            'query_id': query_id,
+            'doc_id': doc_id,
+            'doc_len': doc_len, 
+            'embeddings_pruned': embeddings_pruned
         }
 
-    def persist(self):    
-        self.pruning_dataframes.append(self._get_pruning_info())
-        self.pruning_info = {}
+    def get_dataframe(self):
+        df = pd.DataFrame(self.pruning_info.values(), columns=['query_id', 'doc_id', 'doc_len', 'embeddings_pruned'])
+        return df
     
-    def get_overall_df(self, names=[]):
-        if len(names) != len(self.pruning_dataframes):
-            error = f'The length of names {len(names)} must be equal to the number of dataframes {len(self.pruning_dataframes)}'
-            raise ValueError(error)
-        for i, element in enumerate(self.pruning_dataframes):
-            element['name'] = names[i]
-        final_dataframe = pd.DataFrame(columns=self.pruning_dataframes[0].columns)
-        for element in self.pruning_dataframes:
-            final_dataframe = final_dataframe.append(element)
-        print(f'Concatenated Dataframe: {len(final_dataframe)}')
-        return final_dataframe
-    
-    def get_reduced_df(self, names=[]):
-        if len(names) != len(self.pruning_dataframes):
-            error = f'The length of names {len(names)} must be equal to the number of dataframes {len(self.pruning_dataframes)}'
-            raise ValueError(error)
-        for i, element in enumerate(self.pruning_dataframes):
-            element['name'] = names[i]
-        final_dataframe = pd.DataFrame(columns=self.pruning_dataframes[0].columns[[1, 2, 6]])
-        for df in self.pruning_dataframes:
-            reduced_df = df.drop(df.columns[[0, 3, 4, 5]], axis=1)
-            final_dataframe = final_dataframe.append(reduced_df)
-        print(f'Concatenated Dataframe: {len(final_dataframe)}')
-        return final_dataframe
-    
-    def get_blacklist(self, factory, path, verbose=False):
+    def get_blacklist(factory, path, verbose=False):
         # TODO: refactor the parameter factory (maybe I can pass directly faiss_nn_term)
         faiss_nn_term = factory.nn_term(df=True)
         vocabulary = faiss_nn_term.tok.get_vocab()
@@ -90,19 +65,3 @@ class InfoPruning:
         df = pd.DataFrame(data=rows,
             columns=['qid', '# total embeddings', '# tokens pruned', 'tokens pruned %', 'most pruned document', 'less pruned document'])
         return df
-            
-    def _get_pruning_info_per_query_data(self, query_id, query_data):
-        total_embeddings = 0
-        total_prunings = 0
-        pruning_percentages = []
-        for key, value in query_data.items():
-            total_embeddings += value['doc_len']
-            total_prunings += value['embeddings_pruned']
-            pruning_percentages.append((key, value['embeddings_pruned']/value['doc_len']))
-        overall_percentage = round(total_prunings/total_embeddings * 100, 2)
-        max_pruned = max(pruning_percentages, key= lambda t: t[1])
-        min_pruned = min(pruning_percentages, key= lambda t: t[1])
-        max_pruned_str = f'{max_pruned[0]:4} ({max_pruned[1]:4.2%})'
-        min_pruned_str = f'{min_pruned[0]:4} ({min_pruned[1]:4.2%})'
-        return [query_id, total_embeddings, total_prunings, overall_percentage, max_pruned_str, min_pruned_str]
-
