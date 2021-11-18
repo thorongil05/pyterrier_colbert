@@ -240,38 +240,38 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
     
     The blacklist parameters must contain a list of tokenids that should be removed
     """
-
     import pyterrier as pt
+    import torch
+    import numpy as np
+    
     assert pt.started(), 'PyTerrier must be started'
+    
     pt.tqdm.pandas()
 
     if verbose: print(f'Blacklist composed of {len(blacklist)} elements.')
-    
-    import numpy as np
-    def _prune(row):
         
-        import torch
+    def _prune(row):
         tokens = row['doc_toks']
         embeddings = row['doc_embs']
-        docid = row['docid']
-        qid = row['qid']
+        
         final_mask = (tokens > -1)
         
-        for element in blacklist:
-            element_mask = (tokens == element)
-            final_mask = final_mask & (~ element_mask)
-        
-        row_embs_size = embeddings.size()
-        
-        mask_1d = torch.cat((final_mask, torch.ones(row_embs_size[0] - final_mask.size()[0], dtype=torch.bool)))
-        mask_column = torch.unsqueeze(mask_1d, 1)
-        mask = mask_column.repeat(1, row_embs_size[1])
-        
-        row['doc_embs'] = embeddings[mask].reshape(mask_1d.count_nonzero(), row_embs_size[1])
+        # create the 1-D mask
+        for element in blacklist: final_mask = final_mask & (tokens != element)
+            
+        # apply the mask to the tokens
         row['doc_toks'] = tokens[final_mask]
-
-        pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
-        if not pruningInfo is None: pruningInfo.add(qid, docid, row_embs_size[0], pruned_embeddings) 
+        
+        # pad the 1-d mask
+        row_embs_size = embeddings.size()
+        mask_1d = torch.cat((final_mask, torch.ones(row_embs_size[0] - final_mask.size()[0], dtype=torch.bool)))
+        
+        # apply the padded 1-d mask
+        row['doc_embs'] = embeddings[mask_1d, :]
+        
+        if not pruningInfo is None:
+            pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
+            pruningInfo.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
         return row
 
     def _apply(df):
