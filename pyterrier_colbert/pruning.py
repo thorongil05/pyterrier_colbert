@@ -246,19 +246,44 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
     
     assert pt.started(), 'PyTerrier must be started'
     
+    if torch.cuda.is_available(): 
+        blacklist = torch.Tensor(blacklist).cuda()
+    else:
+        blacklist = torch.Tensor(blacklist)
+        
     pt.tqdm.pandas()
-
+    
     if verbose: print(f'Blacklist composed of {len(blacklist)} elements.')
+        
+    def _prune_gpu(row):
+        tokens = row['doc_toks'].cuda()
+        embeddings = row['doc_embs'].cuda()
+        
+        # create the 1-D mask
+        final_mask = torch.all(tokens[None, :] != blacklist[:, None], axis=0)
+        
+        # apply the mask to the tokens
+        row['doc_toks'] = tokens[final_mask]
+        
+        # pad the 1-d mask
+        row_embs_size = embeddings.size()
+        mask_1d = torch.cat((final_mask, torch.ones(row_embs_size[0] - final_mask.size()[0], dtype=torch.bool).cuda()))
+        
+        # apply the padded 1-d mask
+        row['doc_embs'] = embeddings[mask_1d, :]
+        
+        if not pruningInfo is None:
+            pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
+            pruningInfo.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
+        return row
         
     def _prune(row):
         tokens = row['doc_toks']
         embeddings = row['doc_embs']
-        
-        final_mask = (tokens > -1)
-        
+                                        
         # create the 1-D mask
-        for element in blacklist: final_mask = final_mask & (tokens != element)
-            
+        final_mask = torch.all(tokens[None, :] != blacklist[:, None], axis=0)
+
         # apply the mask to the tokens
         row['doc_toks'] = tokens[final_mask]
         
@@ -273,12 +298,15 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
             pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
             pruningInfo.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
         return row
+    
+    # if cuda is available, use function optimized for gpu.
+    prune_function = _prune_gpu if torch.cuda.is_available() else _prune
 
     def _apply(df):
         if verbose:
-            df = df.progress_apply(_prune, axis=1)
+            df = df.progress_apply(prune_function, axis=1)
         else:
-            df = df.apply(_prune, axis=1)
+            df = df.apply(prune_function, axis=1)
         return df
 
     return pt.apply.generic(_apply)
