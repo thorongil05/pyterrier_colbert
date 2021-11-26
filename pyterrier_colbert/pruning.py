@@ -2,7 +2,7 @@ import pandas as pd
 import pyterrier as pt
 from pyterrier.transformer import TransformerBase
 
-from pyterrier_colbert.info_pruning import InfoPruning
+from pyterrier_colbert.static_pruning import PruningStats
 from .ranking import ColBERTFactory
 
 def _filter_query(query_toks_df : pd.DataFrame) -> pd.DataFrame:
@@ -232,7 +232,7 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             
         return pt.apply.by_query(_score_query)
 
-def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=None, verbose=False) -> TransformerBase:
+def blacklisted_tokens_transformer(factory, blacklist, pruning_stats:PruningStats=None, verbose=False) -> TransformerBase:
     """
     Remove tokens and their embeddings from the document dataframe
     input: qid, query_embs, docno, doc_embs, doc_toks
@@ -258,48 +258,42 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
     def _prune_gpu(row):
         tokens = row['doc_toks'].cuda()
         embeddings = row['doc_embs'].cuda()
+        row_embs_size = embeddings.size()
+        tokens_size = tokens.size()[0]
         
         # create the 1-D mask
-        final_mask = torch.all(tokens[None, :] != blacklist[:, None], axis=0)
+        final_mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+        final_mask[0:tokens_size] = torch.any(tokens[None, :] == blacklist[:, None], axis=0)
         
-        # apply the mask to the tokens
-        row['doc_toks'] = tokens[final_mask]
+        # apply the mask
+        row['doc_toks'][final_mask[0:tokens_size]] = 0
+        row['doc_embs'][final_mask, :] = 0
         
-        # pad the 1-d mask
-        row_embs_size = embeddings.size()
-        mask_1d = torch.cat((final_mask, torch.ones(row_embs_size[0] - final_mask.size()[0], dtype=torch.bool).cuda()))
-        
-        # apply the padded 1-d mask
-        row['doc_embs'] = embeddings[mask_1d, :]
-        
-        if not pruningInfo is None:
-            pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
-            pruningInfo.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
+        if not pruning_stats is None:
+            pruned_embeddings = tokens_size - torch.count_nonzero(row['doc_toks'])
+            pruning_stats.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
         return row
         
     def _prune(row):
         tokens = row['doc_toks']
         embeddings = row['doc_embs']
+        initial_number_of_nonzeros = torch.count_nonzero(tokens)
+        row_embs_size = embeddings.size()
+        tokens_size = tokens.size()[0]
                                         
         # create the 1-D mask
-        final_mask = torch.all(tokens[None, :] != blacklist[:, None], axis=0)
-
-        # apply the mask to the tokens
-        row['doc_toks'] = tokens[final_mask]
+        final_mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+        final_mask[0:tokens_size] = torch.any(tokens[None, :] == blacklist[:, None], axis=0)
+            
+        # apply the mask
+        row['doc_toks'][final_mask[0:tokens_size]] = 0
+        row['doc_embs'][final_mask, :] = 0
         
-        # pad the 1-d mask
-        row_embs_size = embeddings.size()
-        mask_1d = torch.cat((final_mask, torch.ones(row_embs_size[0] - final_mask.size()[0], dtype=torch.bool)))
-        
-        # apply the padded 1-d mask
-        row['doc_embs'] = embeddings[mask_1d, :]
-        
-        if not pruningInfo is None:
-            pruned_embeddings = row_embs_size[0] - row['doc_embs'].size()[0]
-            pruningInfo.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
+        if not pruning_stats is None:
+            pruned_embeddings = initial_number_of_nonzeros - torch.count_nonzero(row['doc_toks'])
+            pruning_stats.add(row['qid'], row['docid'], row_embs_size[0], pruned_embeddings) 
         return row
     
-    # if cuda is available, use function optimized for gpu.
     prune_function = _prune_gpu if torch.cuda.is_available() else _prune
 
     def _apply(df):
@@ -311,14 +305,14 @@ def blacklisted_tokens_transformer(factory, blacklist, pruningInfo:InfoPruning=N
 
     return pt.apply.generic(_apply)
 
-def timer(T: TransformerBase, message) -> TransformerBase:
+def timer(transformer: TransformerBase, message) -> TransformerBase:
     """
-    Timer
+    This transformer can wrap another transformer to measure the time.
     """
     def _apply(_input):
         import time
         start_time = time.time()
-        res = T.transform(_input)
+        res = transformer.transform(_input)
         time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
         print(f"Time elapsed for {message} -> {time_elapsed}")
         return res

@@ -2,7 +2,7 @@ import unittest
 import pandas as pd
 import os
 import torch
-from pyterrier_colbert.info_pruning import InfoPruning
+from pyterrier_colbert.static_pruning import PruningStats
 from pyterrier_colbert.pruning import blacklisted_tokens_transformer
 
 class TestPruning(unittest.TestCase):
@@ -37,7 +37,7 @@ class TestPruning(unittest.TestCase):
             toks = self.test_df.iloc[i].doc_toks
             embs = self.test_df.iloc[i].doc_embs
             for i, tok in enumerate(toks):
-                if tok == 1997: emb = embs[i]
+                if tok == 1997: emb = torch.clone(embs[i]) # deep copy
         transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb, df))
@@ -51,8 +51,8 @@ class TestPruning(unittest.TestCase):
             toks = self.test_df.iloc[i].doc_toks
             embs = self.test_df.iloc[i].doc_embs
             for i, tok in enumerate(toks):
-                if tok == 1997: emb_1 = embs[i]
-                if tok == 3280: emb_2 = embs[i]
+                if tok == 1997: emb_1 = torch.clone(embs[i]) # deep copy
+                if tok == 3280: emb_2 = torch.clone(embs[i]) # deep copy
         transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb_1, df) or self._embs_occurs(emb_2, df))
@@ -61,17 +61,12 @@ class TestPruning(unittest.TestCase):
         '''
         Check if the number of embeddings removed in info_pruning is correct.
         '''
-        info_pruning = InfoPruning()
-        test_blacklist = [1997]
-        for i in range(len(self.test_df)):
-            toks = self.test_df.iloc[i].doc_toks
-            embs = self.test_df.iloc[i].doc_toks
-            for i, tok in enumerate(toks):
-                if tok == 1997: emb = embs[i]
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist, info_pruning)
-        df = transformer.transform(self.test_df)
-        counter = self._count_token_ids(docid=11268, tid=1997)
-        pruning_df = info_pruning.get_dataframe()
+        pruning_stats = PruningStats()
+        test_blacklist = [1996]
+        counter = self._count_token_ids(docid=11268, tid=1996)
+        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist, pruning_stats)
+        _ = transformer.transform(self.test_df)
+        pruning_df = pruning_stats.get_dataframe()
         n_embeddings_removed = pruning_df.loc[pruning_df['doc_id'] == 11268].embeddings_pruned.values
         self.assertTrue(n_embeddings_removed == counter)
         
@@ -100,7 +95,8 @@ class TestPruning(unittest.TestCase):
             doc_embs = df.iloc[i].doc_embs
             for element in doc_embs:
                 if element.is_cuda: element = element.cpu()
-                if torch.equal(emb, element): n_occurrences += 1
+                if torch.equal(emb, element):
+                    n_occurrences += 1
             occurrences_emb.append(n_occurrences)
         for occurrence in occurrences_emb:
             if occurrence > 0: return True

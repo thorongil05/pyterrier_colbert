@@ -2,9 +2,9 @@ import pandas as pd
 import math
 import json
 
-class InfoPruning:
+class PruningStats:
     '''
-    Pruning Class
+    Keep the statistics of the pruning.
     '''
     
     def __init__(self):
@@ -26,6 +26,7 @@ class InfoPruning:
         df = pd.DataFrame(self.pruning_info.values(), columns=['query_id', 'doc_id', 'doc_len', 'embeddings_pruned'])
         return df
     
+    @staticmethod
     def get_blacklist(factory, path, verbose=False):
         # TODO: refactor the parameter factory (maybe I can pass directly faiss_nn_term)
         faiss_nn_term = factory.nn_term(df=True)
