@@ -2,7 +2,7 @@ import pandas as pd
 import math
 import numpy as np
 import json
-from faiss_term_index import FaissNNTerm
+from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import torch
 from pyterrier.transformer import TransformerBase
     
