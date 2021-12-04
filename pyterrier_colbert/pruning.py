@@ -1,8 +1,6 @@
 import pandas as pd
 import pyterrier as pt
 from pyterrier.transformer import TransformerBase
-
-from pyterrier_colbert.static_pruning import PruningStats
 from .ranking import ColBERTFactory
 
 def _filter_query(query_toks_df : pd.DataFrame) -> pd.DataFrame:
@@ -232,7 +230,7 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
             
         return pt.apply.by_query(_score_query)
 
-def blacklisted_tokens_transformer(factory, blacklist, pruning_stats:PruningStats=None, verbose=False) -> TransformerBase:
+def blacklisted_tokens_transformer(factory, blacklist, pruning_stats=None, verbose=False) -> TransformerBase:
     """
     Remove tokens and their embeddings from the document dataframe
     input: qid, query_embs, docno, doc_embs, doc_toks
