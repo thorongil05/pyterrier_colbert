@@ -1,68 +1,77 @@
 import pandas as pd
 import math
+import numpy as np
 import json
-
-class PruningStats:
-    '''
-    Keep the statistics of the pruning.
-    '''
+from faiss_term_index import FaissNNTerm
+import torch
+from pyterrier.transformer import TransformerBase
     
-    def __init__(self):
-        self.pruning_info = {}
-        self.pruning_dataframes = []
-        self.pruning_counter = 0
-        self.n_docs = 0
+def get_pruning_ratio(blacklist, faiss_nn_term : FaissNNTerm):
+    ids_to_prune = torch.tensor(blacklist, dtype=torch.int32)
+    torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune)
+    percentage_reduction_of_corpus = torch.sum(torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune)) / np.sum(faiss_nn_term.doclens)
+    return percentage_reduction_of_corpus
 
-
-    def add(self, query_id, doc_id, doc_len, embeddings_pruned):
-        self.pruning_info[hash((query_id, doc_id))] = {
-            'query_id': query_id,
-            'doc_id': doc_id,
-            'doc_len': doc_len, 
-            'embeddings_pruned': embeddings_pruned
-        }
-
-    def get_dataframe(self):
-        df = pd.DataFrame(self.pruning_info.values(), columns=['query_id', 'doc_id', 'doc_len', 'embeddings_pruned'])
-        return df
+def blacklisted_tokens_transformer(blacklist, verbose=False) -> TransformerBase:
+    """
+    Remove tokens and their embeddings from the document dataframe
+    input: qid, query_embs, docno, doc_embs, doc_toks
+    output: qid, query_embs, docno, doc_embs, doc_toks
     
-    @staticmethod
-    def get_blacklist(factory, path, verbose=False):
-        # TODO: refactor the parameter factory (maybe I can pass directly faiss_nn_term)
-        faiss_nn_term = factory.nn_term(df=True)
-        vocabulary = faiss_nn_term.tok.get_vocab()
-        n_docs = faiss_nn_term.num_docs
-        if verbose:
-            print(f'Number of docs: {n_docs}')
-            print(f'Vocabulary Length: {len(vocabulary)}')
-        with open(path) as f:
-            stopwords = json.load(f)
-        if verbose: print("Stopwords length:", len(stopwords))
-        blacklist_tids = []
-
-        for stopword in stopwords:
-            if stopword in vocabulary:
-                blacklist_tids.append(vocabulary[stopword])
-
-        # Remove items with 0 document frequency
-        if verbose: print("Blacklist length:", len(blacklist_tids))
-        blacklist_tids_dfs = []
-        for tid in blacklist_tids:
-            df = factory.nn_term(df=True).getDF_by_id(tid)
-            idf = math.log(n_docs/(df + 1), 10)
-            if df != 0: blacklist_tids_dfs.append((tid, idf))
-        if verbose: print("Blacklist length (without 0 df elements):", len(blacklist_tids_dfs))
-        # order by inverse document frequency
-        ordered_blacklist = sorted(blacklist_tids_dfs, key= lambda pair: pair[1])
-        final_blacklist = []
-        for _id, _ in ordered_blacklist: final_blacklist.append(_id)
-        return final_blacklist
+    The blacklist parameters must contain a list of tokenids that should be removed
+    """
+    import pyterrier as pt
+    import torch
+    import numpy as np
+    
+    assert pt.started(), 'PyTerrier must be started'
+    
+    if torch.cuda.is_available(): 
+        blacklist = torch.Tensor(blacklist).cuda()
+    else:
+        blacklist = torch.Tensor(blacklist)
+        
+    pt.tqdm.pandas()
+    
+    if verbose: print(f'Blacklist composed of {len(blacklist)} elements.')
+        
+    def _prune_gpu(row):
+        tokens = row['doc_toks'].cuda()
+        embeddings = row['doc_embs'].cuda()
+        row_embs_size = embeddings.size()
+        tokens_size = tokens.size()[0]
+        
+        # create the 1-D mask
+        final_mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+        final_mask[0:tokens_size] = torch.any(tokens[None, :] == blacklist[:, None], axis=0)
+        
+        # apply the mask
+        row['doc_toks'][final_mask[0:tokens_size]] = 0
+        row['doc_embs'][final_mask, :] = 0 
+        return row
+        
+    def _prune(row):
+        tokens = row['doc_toks']
+        embeddings = row['doc_embs']
+        row_embs_size = embeddings.size()
+        tokens_size = tokens.size()[0]
+                                        
+        # create the 1-D mask
+        final_mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+        final_mask[0:tokens_size] = torch.any(tokens[None, :] == blacklist[:, None], axis=0)
             
-    def _get_pruning_info(self):
-        rows = []
-        for query_id, query_data in self.pruning_info.items():
-            row = self._get_pruning_info_per_query_data(query_id, query_data)
-            rows.append(row)
-        df = pd.DataFrame(data=rows,
-            columns=['qid', '# total embeddings', '# tokens pruned', 'tokens pruned %', 'most pruned document', 'less pruned document'])
+        # apply the mask
+        row['doc_toks'][final_mask[0:tokens_size]] = 0
+        row['doc_embs'][final_mask, :] = 0
+        return row
+    
+    prune_function = _prune_gpu if torch.cuda.is_available() else _prune
+
+    def _apply(df):
+        if verbose:
+            df = df.progress_apply(prune_function, axis=1)
+        else:
+            df = df.apply(prune_function, axis=1)
         return df
+
+    return pt.apply.generic(_apply)

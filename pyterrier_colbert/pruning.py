@@ -201,7 +201,7 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
         import pyterrier as pt
         assert pt.started(), 'PyTerrier must be started'
         pt.tqdm.pandas()
-        colbert = factory.args.colbert
+        cuda0 = torch.device('cuda:0')
 
         def _build_interaction(row, D):
             doc_embs = row.doc_embs
@@ -210,18 +210,18 @@ def scorer(factory, add_contributions=False, verbose=False) -> TransformerBase:
         
         def _score_query(df):
             weightsQ = None
-            Q = torch.cat([df.iloc[0].query_embs])
+            Q = torch.cat([df.iloc[0].query_embs]).cuda()
             if "query_weights" in df.columns:
-                weightsQ = df.iloc[0].query_weights
+                weightsQ = df.iloc[0].query_weights.cuda()
             else:
-                weightsQ = torch.ones(Q.shape[0])        
-            D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim)
+                weightsQ = torch.ones(Q.shape[0]).cuda()        
+            D = torch.zeros(len(df), factory.args.doc_maxlen, factory.args.dim, device=cuda0)
             df['row_index'] = range(len(df))
             if verbose:
                 df.progress_apply(lambda row: _build_interaction(row, D), axis=1)
             else:
                 df.apply(lambda row: _build_interaction(row, D), axis=1)
-            maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values.cpu()
+            maxscoreQ = (Q @ D.permute(0, 2, 1)).max(2).values
             scores = (weightsQ*maxscoreQ).sum(1).cpu()
             df["score"] = scores.tolist()
             df = factory._add_docnos(df)

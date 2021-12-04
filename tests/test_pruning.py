@@ -57,19 +57,6 @@ class TestPruning(unittest.TestCase):
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb_1, df) or self._embs_occurs(emb_2, df))
         
-    def test_blacklist_transformer_info_pruning(self):
-        '''
-        Check if the number of embeddings removed in info_pruning is correct.
-        '''
-        pruning_stats = PruningStats()
-        test_blacklist = [1996]
-        counter = self._count_token_ids(docid=11268, tid=1996)
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist, pruning_stats)
-        _ = transformer.transform(self.test_df)
-        pruning_df = pruning_stats.get_dataframe()
-        n_embeddings_removed = pruning_df.loc[pruning_df['doc_id'] == 11268].embeddings_pruned.values
-        self.assertTrue(n_embeddings_removed == counter)
-        
     def _term_occurs(self, tid, df):
         '''
         Return true if the tid occurs in the df
