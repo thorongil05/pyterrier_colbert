@@ -22,7 +22,6 @@ from collections import defaultdict
 import numpy as np
 import pickle
 from warnings import warn
-from pyterrier_colbert.static_pruning import PruningStats
 
 
 class file_part_mmap:
