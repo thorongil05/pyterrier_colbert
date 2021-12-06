@@ -2,10 +2,10 @@ import pandas as pd
 import math
 import numpy as np
 import json
-from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import torch
 from pyterrier.transformer import TransformerBase
-    
+from pyterrier_colbert.faiss_term_index import FaissNNTerm
+
 def get_pruning_ratio(blacklist, faiss_nn_term : FaissNNTerm):
     ids_to_prune = torch.tensor(blacklist, dtype=torch.int32)
     torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune)

@@ -1,21 +1,24 @@
 import unittest
 import pandas as pd
 import os
+from os.path import join
 import torch
-from pyterrier_colbert.static_pruning import PruningStats
-from pyterrier_colbert.pruning import blacklisted_tokens_transformer
+import json
+from pyterrier_colbert.static_pruning import blacklisted_tokens_transformer
 
 class TestPruning(unittest.TestCase):
 
     def setUp(self):
         self.test_df = pd.read_pickle(f"{os.getcwd()}/tests/test-resources/test.pkl")
+        with open(join(os.getcwd(), 'tests', 'test-resources', 'blacklist.json')) as f:
+            self.blacklist = json.load(f)
 
     def test_blacklist_transformer_token(self):
         '''
         Check if the token exists after pruning
         '''
         test_blacklist = [1997]
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
+        transformer = blacklisted_tokens_transformer(test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._term_occurs(1997, df))
         
@@ -24,9 +27,20 @@ class TestPruning(unittest.TestCase):
         Check if the two tokens exist after pruning
         '''
         test_blacklist = [1997, 3280]
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
+        transformer = blacklisted_tokens_transformer(test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._term_occurs(1997, df) or self._term_occurs(3280, df))
+
+    def test_blacklist_transformer_token_3(self):
+        '''
+        Check if the token list exist after pruning
+        '''
+        transformer = blacklisted_tokens_transformer(self.blacklist)
+        df = transformer.transform(self.test_df)
+        for token in self.blacklist:
+            if self._term_occurs(token, df):
+                self.assertTrue(False)
+        self.assertTrue(True)
     
     def test_blacklist_transformer_embs(self):
         '''
@@ -38,7 +52,7 @@ class TestPruning(unittest.TestCase):
             embs = self.test_df.iloc[i].doc_embs
             for i, tok in enumerate(toks):
                 if tok == 1997: emb = torch.clone(embs[i]) # deep copy
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
+        transformer = blacklisted_tokens_transformer(test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb, df))
         
@@ -53,7 +67,7 @@ class TestPruning(unittest.TestCase):
             for i, tok in enumerate(toks):
                 if tok == 1997: emb_1 = torch.clone(embs[i]) # deep copy
                 if tok == 3280: emb_2 = torch.clone(embs[i]) # deep copy
-        transformer = blacklisted_tokens_transformer(self.test_df, test_blacklist)
+        transformer = blacklisted_tokens_transformer(test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb_1, df) or self._embs_occurs(emb_2, df))
         
