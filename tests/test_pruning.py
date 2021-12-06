@@ -41,6 +41,14 @@ class TestPruning(unittest.TestCase):
             if self._term_occurs(token, df):
                 self.assertTrue(False)
         self.assertTrue(True)
+
+    def test_blacklist_transformer_token_4(self):
+        '''
+        Check if the token not present in the blacklist is not deleted after pruning
+        '''
+        transformer = blacklisted_tokens_transformer(self.blacklist)
+        df = transformer.transform(self.test_df)
+        self.assertTrue(self._term_occurs(1997, df))
     
     def test_blacklist_transformer_embs(self):
         '''
@@ -70,6 +78,24 @@ class TestPruning(unittest.TestCase):
         transformer = blacklisted_tokens_transformer(test_blacklist)
         df = transformer.transform(self.test_df)
         self.assertFalse(self._embs_occurs(emb_1, df) or self._embs_occurs(emb_2, df))
+
+    def test_blacklist_transformer_embs_3(self):
+        '''
+        Check if the two embeddings related to the tokens exist after pruning
+        '''
+        embeddings = torch.zeros((len(self.blacklist), 128))
+        for i in range(len(self.test_df)):
+            toks = self.test_df.iloc[i].doc_toks
+            embs = self.test_df.iloc[i].doc_embs
+            for i, tok in enumerate(toks):
+                if tok in embeddings:
+                    embeddings[i, :] = torch.clone(embs[i])
+        transformer = blacklisted_tokens_transformer(self.blacklist)
+        df = transformer.transform(self.test_df)
+        for i in range(embeddings.size()[0]):
+            if self._embs_occurs(embeddings[i, :], df) and not torch.equal(embeddings[i, :], torch.zeros(128)):
+                self.assertTrue(False)
+        self.assertTrue(True)
         
     def _term_occurs(self, tid, df):
         '''
