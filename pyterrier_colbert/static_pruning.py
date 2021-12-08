@@ -7,10 +7,11 @@ from pyterrier.transformer import TransformerBase
 from pyterrier_colbert.faiss_term_index import FaissNNTerm
 
 def get_pruning_ratio(blacklist, faiss_nn_term : FaissNNTerm):
-    ids_to_prune = torch.tensor(blacklist, dtype=torch.int32)
-    torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune)
-    percentage_reduction_of_corpus = torch.sum(torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune)) / np.sum(faiss_nn_term.doclens)
-    return percentage_reduction_of_corpus
+    ids_to_prune = torch.unique(torch.tensor(blacklist, dtype=torch.int32))
+    embeddings_to_prune = torch.sum(torch.index_select(faiss_nn_term.lookup, 0, ids_to_prune))
+    total_embeddings = torch.sum(faiss_nn_term.lookup)
+    percentage_reduction_of_corpus = embeddings_to_prune / total_embeddings
+    return round(percentage_reduction_of_corpus.item() * 100, 2)
 
 def blacklisted_tokens_transformer(blacklist, verbose=False) -> TransformerBase:
     """
