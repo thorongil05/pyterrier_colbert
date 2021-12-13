@@ -155,7 +155,7 @@ def fetch_index_encodings(factory, verbose=False, ids=False) -> TransformerBase:
         def _get_toks(pid):
             end = fnt.end_offsets[pid]
             start = end - fnt.doclens[pid]
-            return fnt.emb2tid[start:end]
+            return fnt.emb2tid[start:end].clone()
 
         if verbose:
             import pyterrier as pt
