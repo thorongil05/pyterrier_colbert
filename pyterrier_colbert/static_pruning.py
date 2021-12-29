@@ -4,6 +4,11 @@ import torch
 from pyterrier.transformer import TransformerBase
 from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import os
+import pyterrier as pt
+import time
+from pyterrier.measures import RR, nDCG, AP, MRR
+from pyterrier_colbert.pruning import scorer, fetch_index_encodings
+from pyterrier_colbert.ranking import ColBERTFactory
 
 def get_pruning_ratio(blacklist, faiss_nn_term : FaissNNTerm):
     # Returns the percentage of pruning: e.g. 50%
@@ -127,3 +132,54 @@ def get_stopwords_from_file(faiss_nn_term : FaissNNTerm, path):
             tids.append(tid)
     print(f'tids found for those stopwords: {len(tids)}')
     return tids
+
+def run_single_experiment(pipeline, batch_size, name, topics, qrels, save_dir):
+    start_time = time.time()
+    df_experiment = pt.Experiment(
+        [pipeline],
+        topics,
+        qrels,
+        batch_size=batch_size,
+        filter_by_qrels=True,
+        eval_metrics=[RR(rel=2), nDCG@10, nDCG@100, AP(rel=2), 'recip_rank', RR@10, MRR@10],
+        names=[name],
+        save_dir=save_dir,
+        verbose=True
+    )
+    time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))    
+    return df_experiment, time_elapsed
+
+def get_pipeline(factory, blacklist, k1):
+    pipeline = (
+        factory.query_encoder()
+        >> (factory.ann_retrieve_score(query_encoded=True) % k1)
+        >> fetch_index_encodings(factory, ids=True, verbose=False)
+        >> blacklisted_tokens_transformer(blacklist, verbose=False)
+        >> scorer(factory, verbose=False)
+        >> pt.apply.doc_embs(drop=True)
+        >> pt.apply.query_embs(drop=True)
+    )
+    return pipeline
+
+def blacklist_experiment(factory: ColBERTFactory, k1, blacklist, name, short_name, topics, qrels, save_dir, batch_size=50):
+    faiss_nn_term = factory.nn_term(df=True)
+    torch.cuda.empty_cache()
+    pipeline = get_pipeline(factory, blacklist, k1)
+    df_experiment, time_elapsed = run_single_experiment(pipeline, batch_size, name, topics, qrels, save_dir)
+    df_experiment = df_experiment.set_index('name')
+    idx_pruning = get_pruning_ratio(blacklist, faiss_nn_term)
+    df_experiment['% index pruning'] = idx_pruning
+    if idx_pruning != 0:
+        df_experiment['reduction'] = get_reduction(blacklist, faiss_nn_term)
+    else:
+        df_experiment['reduction'] = 1
+    df_experiment['short-name'] = short_name
+    send_notification(f'Index Pruning: {idx_pruning} for {short_name} in {time_elapsed}')
+    return df_experiment
+
+def send_notification(message):
+    url = 'https://pytraining-bot.herokuapp.com/notify'
+    chat_id = 182166729
+    body = {'message': message, 'chat_id': chat_id}
+    import requests
+    requests.post(url = url, data=body)
