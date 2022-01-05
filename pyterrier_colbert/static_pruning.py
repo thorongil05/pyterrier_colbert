@@ -143,7 +143,7 @@ def run_single_experiment(pipeline, batch_size, name, topics, qrels, save_dir):
         qrels,
         batch_size=batch_size,
         filter_by_qrels=True,
-        eval_metrics=[RR(rel=2), nDCG@10, nDCG@100, AP(rel=2), 'recip_rank', RR@10, MRR@10],
+        eval_metrics=MEASURES,
         names=[name],
         save_dir=save_dir,
         verbose=True
