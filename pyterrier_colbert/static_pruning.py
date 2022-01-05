@@ -6,7 +6,7 @@ from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import os
 import pyterrier as pt
 import time
-from pyterrier.measures import RR, nDCG, AP, MRR, R
+from pyterrier.measures import RR, nDCG, AP, R
 from pyterrier_colbert.pruning import scorer, fetch_index_encodings
 from pyterrier_colbert.ranking import ColBERTFactory
 import ir_measures
@@ -203,4 +203,18 @@ AvgDocLen = ir_measures.define_byquery(
     _avg_doc_len, 
     name="AvgDoclen")
 
-MEASURES = [AP(rel=2)@1000, nDCG@10,nDCG@20,nDCG@100, RR(rel=2)@10,RR(rel=2),R(rel=2)@1000,"mrt", AvgDocLen@1, AvgDocLen@10, AvgDocLen@100, AvgDocLen]
+MEASURES = [
+    AP(rel=2)@1000, 
+    nDCG@10,
+    nDCG@20,
+    nDCG@100, 
+    RR(rel=2)@10,
+    RR(rel=2),
+    R(rel=2)@1000, 
+    RR@10, 
+    "mrt", 
+    AvgDocLen@1, 
+    AvgDocLen@10, 
+    AvgDocLen@100, 
+    AvgDocLen
+]
