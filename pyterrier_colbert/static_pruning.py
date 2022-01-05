@@ -6,9 +6,11 @@ from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import os
 import pyterrier as pt
 import time
-from pyterrier.measures import RR, nDCG, AP, MRR
+from pyterrier.measures import RR, nDCG, AP, MRR, R
 from pyterrier_colbert.pruning import scorer, fetch_index_encodings
 from pyterrier_colbert.ranking import ColBERTFactory
+import ir_measures
+
 
 def get_pruning_ratio(blacklist, faiss_nn_term : FaissNNTerm):
     # Returns the percentage of pruning: e.g. 50%
@@ -183,3 +185,22 @@ def send_notification(message):
     body = {'message': message, 'chat_id': chat_id}
     import requests
     requests.post(url = url, data=body)
+
+# New measures
+
+def _avg_doc_len(qrels, run):
+    from warnings import warn
+    if 'doc_toks' not in run.columns:
+        if len ( run )  > 0:
+            warn("run of %d rows did not have doc_toks column; available columns: %s" % (len ( run ), str(run.columns)))
+        else:
+            warn("empty run did not have doc_toks column; available columns: %s" % str(run.columns))
+        return 0
+    return run['doc_toks'].apply(lambda row: row.shape[0]).mean()
+    
+
+AvgDocLen = ir_measures.define_byquery(
+    _avg_doc_len, 
+    name="AvgDoclen")
+
+MEASURES = [AP(rel=2)@1000, nDCG@10,nDCG@20,nDCG@100, RR(rel=2)@10,RR(rel=2),R(rel=2)@1000,"mrt", AvgDocLen@1, AvgDocLen@10, AvgDocLen@100, AvgDocLen]
