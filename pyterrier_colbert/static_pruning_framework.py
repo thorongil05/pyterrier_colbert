@@ -9,6 +9,8 @@ import pandas as pd
 import ir_measures
 import torch
 import time
+import json
+import math
 
 class StaticPruningFramework:
 
@@ -103,6 +105,49 @@ class StaticPruningFramework:
             message = f'Experiment {name} completed in {time_elapsed} with a reduction of {self.index_reduction}x'
             notification_function(message)
         return df_base
+
+    def get_stopwords_from_file(self, path):
+        '''
+        Get the tids from a json list of stopwords (path)
+        '''
+        assert hasattr(self.faiss_nn_term, 'dfs'), 'FaissNNTerm class must be initialized with dfs=True'
+        vocabulary = self.faiss_nn_term.tok.get_vocab()
+        with open(path) as f:
+            stopwords = json.load(f)
+        print(f'Loaded {len(stopwords)} stopwords')
+        tids = []
+        for term in stopwords:
+            if term in vocabulary:
+                tid = vocabulary[term]
+                tids.append(tid)
+        print(f'tids found for those stopwords: {len(tids)}')
+        return torch.tensor(tids)
+
+    def get_tid_ordered_by_idf(self, verbose=False):
+        
+        assert hasattr(self.faiss_nn_term, 'dfs'), 'FaissNNTerm class must be initialized with dfs=True'
+
+        vocabulary = self.faiss_nn_term.tok.get_vocab()
+        n_docs = self.faiss_nn_term.num_docs
+        
+        if verbose:
+            print(f'Number of docs: {n_docs}')
+            print(f'Vocabulary Length: {len(vocabulary)}')
+       
+        tokens = []
+        for token in vocabulary:
+            tid = vocabulary[token]
+            df = self.faiss_nn_term.getDF_by_id(tid)
+            if(df != 0):
+                idf = math.log(n_docs/(df + 1), 10)
+                tokens.append((tid, idf))
+        
+        # Remove items with 0 document frequency
+        if verbose: print("Token length (without 0 df elements):", len(tokens))
+        # order by inverse document frequency
+        ordered_tokens = sorted(tokens, key= lambda pair: pair[1])
+        final_token_list = [_id for _id, _ in ordered_tokens]
+        return final_token_list   
     
     ## Private Methods
 
