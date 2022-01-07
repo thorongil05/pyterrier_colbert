@@ -1,9 +1,12 @@
 import math
 import json
+import pandas as pd
 import torch
 from pyterrier.transformer import TransformerBase
 from pyterrier_colbert.faiss_term_index import FaissNNTerm
 import os
+import torch
+import numpy as np
 import pyterrier as pt
 import time
 from pyterrier.measures import RR, nDCG, AP, R
@@ -36,9 +39,6 @@ def blacklisted_tokens_transformer(blacklist, verbose=False) -> TransformerBase:
     
     The blacklist parameters must contain a list of tokenids that should be removed
     """
-    import pyterrier as pt
-    import torch
-    import numpy as np
     
     assert pt.started(), 'PyTerrier must be started'
     
@@ -83,11 +83,13 @@ def blacklisted_tokens_transformer(blacklist, verbose=False) -> TransformerBase:
     
     prune_function = _prune_gpu if torch.cuda.is_available() else _prune
 
-    def _apply(df):
+    def _apply(df: pd.DataFrame):
+        print('Columns before: ' + df.columns)
         if verbose:
             df = df.progress_apply(prune_function, axis=1)
         else:
             df = df.apply(prune_function, axis=1)
+        print('Columns after: ' + df.columns)
         return df
 
     return pt.apply.generic(_apply)
