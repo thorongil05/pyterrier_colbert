@@ -37,16 +37,14 @@ class StaticPruningVisualization:
         plt.ioff()
         fig, ax = plt.subplots(figsize=self.fig_size)
         fig.suptitle(y_value + ' - comparison', fontsize=30)
-        if self.pruning_measure == PruningMeasure.AVERAGE_REDUCTION:
-            self.inf_x_limit = min([min(dataframe[x_value])for dataframe in self.dataframes])
-            self.sup_x_limit = max([max(dataframe[x_value])for dataframe in self.dataframes])
-        ax.set_xlim([self.inf_x_limit, self.sup_x_limit])
+        if self.pruning_measure != PruningMeasure.AVERAGE_REDUCTION:
+            ax.set_xlim([self.inf_x_limit, self.sup_x_limit])
+            ax.set_ylim([0, 1])
         for dataframe, name, color in zip(self.dataframes, self.names, colors):
             dataframe = dataframe.sort_values(by=x_value)
             ax.plot(dataframe[x_value], dataframe[y_value], marker=marker, label=name, color=color)
             if label_column and label_column in dataframe.columns: 
                 self._plot_labels(ax, dataframe, label_column, x_value, y_value)
-        ax.set_ylim([0, 1])
         ax.set_xlabel(x_value, fontsize=self.font_size)
         ax.set_ylabel(y_value, fontsize=self.font_size)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
