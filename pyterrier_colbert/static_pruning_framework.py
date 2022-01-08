@@ -24,9 +24,6 @@ class StaticPruningFramework:
 
     def setup(self, dataset_name: str, topics_type: str, index: Tuple, checkpoint: str, save_dir: str = None):
         print('Initializing the ColBERT environment...')
-        print(index)
-        print(*index)
-        print(len(index))
         if len(index) != 2:
             raise ValueError('The index variable must be a tuple composed by the index folder path and the index file name')
         if not pt.started(): pt.init()
@@ -181,7 +178,7 @@ class StaticPruningFramework:
             AvgDocLen@100, 
             AvgDocLen
         ]
-        self.measures = MEASURES
+        return MEASURES
 
     def _compute_index_pruning_values(self):
         # Returns a tuple containing:
