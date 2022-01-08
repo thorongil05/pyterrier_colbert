@@ -1,9 +1,8 @@
-from pyterrier_colbert.static_pruning import get_reduction
 from pyterrier_colbert.ranking import ColBERTFactory
 from pyterrier.transformer import TransformerBase
 from pyterrier.measures import AP, nDCG, RR, R
 from warnings import warn
-from typing import Tuple
+from typing import Tuple, Callable
 import pyterrier as pt
 import pandas as pd
 import ir_measures
@@ -56,7 +55,7 @@ class StaticPruningFramework:
         )
         self.pipeline = pipeline
 
-    def single_run(self, name, short_name, verbose=False, notification_function: function = None):
+    def single_run(self, name, short_name, verbose=False, notification_function: Callable = None):
         # notification_function is a function to send a notification when the experiment ends.
         start_time = time.time()
         df_experiment = pt.Experiment(
