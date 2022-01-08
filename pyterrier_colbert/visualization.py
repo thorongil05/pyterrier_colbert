@@ -9,8 +9,8 @@ class PruningMeasure(Enum):
 
 class StaticPruningVisualization:
 
-    def __init__(self, pruning_measure : PruningMeasure = PruningMeasure.INDEX_REDUCTION, colors : List(str) = None):
-        if colors:
+    def __init__(self, pruning_measure : PruningMeasure = PruningMeasure.INDEX_REDUCTION, colors = None):
+        if colors and type(colors) == List(str):
             self.colors = colors
         else:
             self.colors = ['green', 'red', 'blue', 'orange', 'grey', 'brown']
