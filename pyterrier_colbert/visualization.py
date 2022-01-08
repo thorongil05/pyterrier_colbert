@@ -38,8 +38,8 @@ class StaticPruningVisualization:
         fig, ax = plt.subplots(figsize=self.fig_size)
         fig.suptitle(y_value + ' - comparison', fontsize=30)
         if self.pruning_measure == PruningMeasure.AVERAGE_REDUCTION:
-            self.inf_x_limit = min([min(dataframe[y_value])for dataframe in self.dataframes])
-            self.sup_x_limit = max([max(dataframe[y_value])for dataframe in self.dataframes])
+            self.inf_x_limit = min([min(dataframe[x_value])for dataframe in self.dataframes]) * 100
+            self.sup_x_limit = max([max(dataframe[x_value])for dataframe in self.dataframes]) * 100
         ax.set_xlim([self.inf_x_limit, self.sup_x_limit])
         for dataframe, name, color in zip(self.dataframes, self.names, colors):
             dataframe = dataframe.sort_values(by=x_value)
