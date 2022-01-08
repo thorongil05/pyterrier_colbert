@@ -9,8 +9,8 @@ class PruningMeasure(Enum):
 
 class StaticPruningVisualization:
 
-    def __init__(self, pruning_measure : PruningMeasure = PruningMeasure.INDEX_REDUCTION, colors = None):
-        if colors and type(colors) == List(str):
+    def __init__(self, pruning_measure : PruningMeasure = PruningMeasure.INDEX_REDUCTION, colors : List[str] = None):
+        if colors:
             self.colors = colors
         else:
             self.colors = ['green', 'red', 'blue', 'orange', 'grey', 'brown']
@@ -26,7 +26,7 @@ class StaticPruningVisualization:
             self.inf_x_limit = 0
             self.sup_x_limit = 100
 
-    def set_data(self, dataframes : List(pd.DataFrame), names : List(str)):
+    def set_data(self, dataframes : List[pd.DataFrame], names : List[str]):
         self.names = names
         self.dataframes = dataframes
 
