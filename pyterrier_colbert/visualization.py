@@ -14,11 +14,13 @@ class StaticPruningVisualization:
         if colors:
             self.colors = colors
         else:
-            self.colors = ['green', 'red', 'blue', 'orange', 'grey', 'brown']
+            self.colors = ['green', 'red', 'orange', 'yellow', 'blue', 'violet', 'brown', 'grey', 'black']
         self.names = []
         self.dataframes : List(pd.DataFrame) = []
         self.font_size = 18
         self.fig_size = (10,8)
+        self.inf_y_limit = 0
+        self.sup_y_limit = 1
         self.pruning_measure : PruningMeasure = pruning_measure
         if pruning_measure == PruningMeasure.INDEX_REDUCTION:
             self.inf_x_limit = 1
@@ -39,7 +41,7 @@ class StaticPruningVisualization:
         fig.suptitle(y_value + ' - comparison', fontsize=30)
         if self.pruning_measure != PruningMeasure.AVERAGE_REDUCTION:
             ax.set_xlim([self.inf_x_limit, self.sup_x_limit])
-            ax.set_ylim([0, 1])
+        ax.set_ylim([self.inf_y_limit, self.sup_y_limit])
         for dataframe, name, color in zip(self.dataframes, self.names, colors):
             dataframe = dataframe.sort_values(by=x_value)
             ax.plot(dataframe[x_value], dataframe[y_value], marker=marker, label=name, color=color)
