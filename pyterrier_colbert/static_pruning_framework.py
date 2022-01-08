@@ -24,6 +24,7 @@ class StaticPruningFramework:
 
     def setup(self, dataset_name: str, topics_type: str, index: Tuple, checkpoint: str, save_dir: str = None):
         print('Initializing the ColBERT environment...')
+        print(len(index), len(*index))
         if len(index) != 2:
             raise ValueError('The index variable must be a tuple composed by the index folder path and the index file name')
         if not pt.started(): pt.init()
