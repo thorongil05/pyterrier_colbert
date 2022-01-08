@@ -6,6 +6,7 @@ from typing import Tuple, Callable
 import pyterrier as pt
 import pandas as pd
 import ir_measures
+import warnings
 import torch
 import time
 import json
@@ -22,21 +23,26 @@ class StaticPruningFramework:
         self.batch_size : int = 50
         self.measures = self._initialize_measures()
 
-    def setup(self, dataset_name: str, topics_type: str, index: Tuple, checkpoint: str, save_dir: str = None):
-        print('Initializing the ColBERT environment...')
-        if len(index) != 2:
-            raise ValueError('The index variable must be a tuple composed by the index folder path and the index file name')
-        if not pt.started(): pt.init()
-        dataset = pt.get_dataset(dataset_name)
-        self.topics = dataset.get_topics(topics_type)
-        self.qrels =  dataset.get_qrels(topics_type)
-        self.factory = ColBERTFactory(checkpoint, *index)
-        self.faiss_nn_term = self.factory.nn_term(df=True)
-        self.k1 = 1000 # the number of documents retrieved in ann phase
-        self.save_dir = save_dir
-        torch.cuda.empty_cache()
-        print('Cuda cache cleaned.')
-        print('ColBERT environment initialized')
+    def setup(self, dataset_name: str, topics_type: str, index: Tuple, checkpoint: str, save_dir: str = None, verbose=False):
+        with warnings.catch_warnings():
+            if verbose:
+                warnings.simplefilter('default')
+            else:
+                warnings.simplefilter("ignore")
+            print('Initializing the ColBERT environment...')
+            if len(index) != 2:
+                raise ValueError('The index variable must be a tuple composed by the index folder path and the index file name')
+            if not pt.started(): pt.init()
+            dataset = pt.get_dataset(dataset_name)
+            self.topics = dataset.get_topics(topics_type)
+            self.qrels =  dataset.get_qrels(topics_type)
+            self.factory = ColBERTFactory(checkpoint, *index)
+            self.faiss_nn_term = self.factory.nn_term(df=True)
+            self.k1 = 1000 # the number of documents retrieved in ann phase
+            self.save_dir = save_dir
+            torch.cuda.empty_cache()
+            print('Cuda cache cleaned.')
+            print('ColBERT environment initialized')
 
     def initialize_blacklist(self, blacklist : torch.Tensor):
         self.blacklist = blacklist
@@ -251,12 +257,10 @@ class StaticPruningFramework:
         prune_function = _prune_gpu if torch.cuda.is_available() else _prune
 
         def _apply(df: pd.DataFrame):
-            print('Columns before: ' + df.columns)
             if verbose:
                 df = df.progress_apply(prune_function, axis=1)
             else:
                 df = df.apply(prune_function, axis=1)
-            print('Columns after: ' + df.columns)
             return df
 
         return pt.apply.generic(_apply)
