@@ -18,7 +18,7 @@ class StaticPruningVisualization:
         self.names = []
         self.dataframes : List(pd.DataFrame) = []
         self.font_size = 18
-        self.fig_size = (16,10)
+        self.fig_size = (10,10)
         self.pruning_measure : PruningMeasure = pruning_measure
         if pruning_measure == PruningMeasure.INDEX_REDUCTION:
             self.inf_x_limit = 1
@@ -51,5 +51,5 @@ class StaticPruningVisualization:
         ax.set_ylim([0, 1])
         ax.set_xlabel(x_value, fontsize=self.font_size)
         ax.set_ylabel(y_value, fontsize=self.font_size)
-        ax.legend(loc="best")
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         return fig, ax
