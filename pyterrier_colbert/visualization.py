@@ -26,20 +26,20 @@ class StaticPruningVisualization:
         if pruning_measure == PruningMeasure.PERCENTAGE:
             self.inf_x_limit = 0
             self.sup_x_limit = 100
-        if pruning_measure == PruningMeasure.AVERAGE_REDUCTION:
-            self.inf_x_limit = 0
-            self.sup_x_limit = 1
 
     def set_data(self, dataframes : List[pd.DataFrame], names : List[str]):
         self.names = names
         self.dataframes = dataframes
 
-    def plot(self, x_value='reduction', y_value : str = 'nDCG@10', label_column='short-name', marker='o'):
+    def plot(self, x_value='reduction', y_value : str = 'nDCG@10', label_column='short-name', marker=''):
         assert len(self.dataframes) == len(self.names) and len(self.dataframes) != 0, 'names and dataframes must be of the same length'
         colors = self.colors[:len(self.dataframes)]
         plt.ioff()
         fig, ax = plt.subplots(figsize=self.fig_size)
         fig.suptitle(y_value + ' - comparison', fontsize=30)
+        if self.pruning_measure == PruningMeasure.AVERAGE_REDUCTION:
+            self.inf_x_limit = min([min(dataframe[y_value])for dataframe in self.dataframes])
+            self.sup_x_limit = max([max(dataframe[y_value])for dataframe in self.dataframes])
         ax.set_xlim([self.inf_x_limit, self.sup_x_limit])
         for dataframe, name, color in zip(self.dataframes, self.names, colors):
             dataframe = dataframe.sort_values(by=x_value)
