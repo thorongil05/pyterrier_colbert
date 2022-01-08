@@ -79,7 +79,7 @@ class StaticPruningFramework:
             notification_function(message)
         return df_experiment
 
-    def run_baseline(self, notification_function : function, verbose=False):
+    def run_baseline(self, notification_function : Callable, verbose=False):
         colbert_ann = ((self.factory.ann_retrieve_score(query_encoded=False, verbose=False) % self.k1)
                >> self.factory.index_scorer(query_encoded=True))
         name, short_name = 'colbert-base', 'base'
