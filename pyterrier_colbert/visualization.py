@@ -4,8 +4,8 @@ import pandas as pd
 from enum import Enum
 
 class PruningMeasure(Enum):
-    PERCENTAGE: 0
-    INDEX_REDUCTION: 1
+    PERCENTAGE = 0
+    INDEX_REDUCTION = 1
 
 class StaticPruningVisualization:
 
