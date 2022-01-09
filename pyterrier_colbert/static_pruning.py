@@ -198,7 +198,7 @@ def _avg_doc_len(qrels, run):
         else:
             warn("empty run did not have doc_toks column; available columns: %s" % str(run.columns))
         return 0
-    return run['doc_toks'].apply(lambda row: row.shape[0]).mean()
+    return run['doc_toks'].apply(lambda row: row.nonzero().shape[0]).mean()
     
 
 AvgDocLen = ir_measures.define_byquery(
