@@ -49,17 +49,19 @@ class StaticPruningFramework:
         self.index_pruning_percentage, self.index_reduction = self._compute_index_pruning_values()
 
     def initialize_pipeline(self, pipeline : TransformerBase = None):
-        if pipeline is not None: self.pipeline = pipeline
-        pipeline = (
-            self.factory.query_encoder()
-            >> (self.factory.ann_retrieve_score(query_encoded=True) % self.k1)
-            >> self.fetch_index_encodings(ids=True, verbose=False)
-            >> self.blacklisted_tokens_transformer(self.blacklist, verbose=False)
-            >> self.scorer(verbose=False)
-            >> pt.apply.doc_embs(drop=True)
-            >> pt.apply.query_embs(drop=True)
-        )
-        self.pipeline = pipeline
+        if pipeline is not None: 
+            self.pipeline = pipeline
+        else:
+            pipeline = (
+                self.factory.query_encoder()
+                >> (self.factory.ann_retrieve_score(query_encoded=True) % self.k1)
+                >> self.fetch_index_encodings(ids=True, verbose=False)
+                >> self.blacklisted_tokens_transformer(self.blacklist, verbose=False)
+                >> self.scorer(verbose=False)
+                >> pt.apply.doc_embs(drop=True)
+                >> pt.apply.query_embs(drop=True)
+            )
+            self.pipeline = pipeline
 
     def single_run(self, name, short_name, verbose=False, notification_function: Callable = None):
         # notification_function is a function to send a notification when the experiment ends.
@@ -207,6 +209,9 @@ class StaticPruningFramework:
     def remove_embeddings(self, k, nn=5, p=2, verbose=True) -> TransformerBase:
         """
         Removes the embeddings which are supposed to be meaningless
+        k : number of elements to remove
+        nn : nearest neighbors to consider
+        p : distance (p = 2 is the euclidean distance)
         """
 
         def _prune(row):
