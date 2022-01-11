@@ -80,8 +80,8 @@ class StaticPruningFramework:
         )
         time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
         df_experiment = df_experiment.set_index('name')
-        if self.index_pruning_percentage: df_experiment['% index pruning'] = self.index_pruning_percentage
-        if self.index_reduction: df_experiment['reduction'] = self.index_reduction
+        if hasattr(self, 'index_pruning_percentage'): df_experiment['% index pruning'] = self.index_pruning_percentage
+        if hasattr(self, 'index_reduction'): df_experiment['reduction'] = self.index_reduction
         df_experiment['short-name'] = short_name
         if not notification_function is None:
             message = f'Experiment {name} completed in {time_elapsed} with a reduction of {self.index_reduction}x'
