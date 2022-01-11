@@ -223,7 +223,7 @@ class StaticPruningFramework:
             faiss = self.faiss_nn_term.faiss_index.faiss_index ## it is nested
             distances = torch.zeros(tokens_size)
             for i, e in enumerate(embeddings[:tokens_size]):
-                nn_neighbors, _ = faiss.search(e, nn)
+                nn_neighbors = faiss.search(e, nn)
                 distances[i] = torch.cdist(e.view(row_embs_size.shape()[0], 1), nn_neighbors, p=p).sum()
             _, permutation = torch.sort(distances, descending=True)
             sorted_tokens = tokens[permutation.data]
