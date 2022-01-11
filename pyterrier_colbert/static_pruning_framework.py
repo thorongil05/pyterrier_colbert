@@ -204,6 +204,42 @@ class StaticPruningFramework:
 
     ## Transformers
 
+    def remove_embeddings(self, k, nn=5, p=2, verbose=True) -> TransformerBase:
+        """
+        Removes the embeddings which are supposed to be meaningless
+        """
+
+        def _prune(row):
+            tokens = row['doc_toks'].cuda()
+            embeddings = row['doc_embs'].cuda()
+            row_embs_size = embeddings.size()
+            tokens_size = tokens.size()[0]
+
+            faiss = self.faiss_nn_term.faiss_index.faiss_index ## it is nested
+            distances = torch.zeros(tokens_size)
+            for i, e in enumerate(embeddings[:tokens_size]):
+                nn_neighbors, _ = faiss.search(e, nn)
+                distances[i] = torch.cdist(e.view(row_embs_size.shape()[0], 1), nn_neighbors, p=p).sum()
+            _, permutation = torch.sort(distances, descending=True)
+            sorted_tokens = tokens[permutation.data]
+
+            mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+            mask[:tokens_size] = torch.any(tokens[None, :] == sorted_tokens[-k:, None], axis=0)
+            
+            row['doc_toks'][mask[0:tokens_size]] = 0
+            row['doc_embs'][mask, :] = 0 
+            return row
+
+        def _apply(df: pd.DataFrame):
+            if verbose:
+                df = df.progress_apply(_prune, axis=1)
+            else:
+                df = df.apply(_prune, axis=1)
+            return df
+
+        
+        return pt.apply.generic(_apply)
+
     def blacklisted_tokens_transformer(self, blacklist, verbose=False) -> TransformerBase:
         """
         Remove tokens and their embeddings from the document dataframe
