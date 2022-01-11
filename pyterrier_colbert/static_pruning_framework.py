@@ -5,6 +5,7 @@ from warnings import warn
 from typing import Tuple, Callable
 import pyterrier as pt
 import pandas as pd
+import numpy as np
 import ir_measures
 import warnings
 import torch
@@ -79,8 +80,8 @@ class StaticPruningFramework:
         )
         time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
         df_experiment = df_experiment.set_index('name')
-        df_experiment['% index pruning'] = self.index_pruning_percentage
-        df_experiment['reduction'] = self.index_reduction
+        if self.index_pruning_percentage: df_experiment['% index pruning'] = self.index_pruning_percentage
+        if self.index_reduction: df_experiment['reduction'] = self.index_reduction
         df_experiment['short-name'] = short_name
         if not notification_function is None:
             message = f'Experiment {name} completed in {time_elapsed} with a reduction of {self.index_reduction}x'
@@ -222,9 +223,9 @@ class StaticPruningFramework:
 
             faiss = self.faiss_nn_term.faiss_index.faiss_index ## it is nested
             distances = torch.zeros(tokens_size)
-            for i, e in enumerate(embeddings[:tokens_size]):
-                nn_neighbors = faiss.search(e, nn)
-                distances[i] = torch.cdist(e.view(row_embs_size.shape()[0], 1), nn_neighbors, p=p).sum()
+            for i, emb in enumerate(embeddings[:tokens_size]):
+                nn_distances, _ = faiss.search(np.expand_dims(emb.cpu(), axis=0), nn)
+                distances[i] = torch.Tensor(nn_distances).sum()
             _, permutation = torch.sort(distances, descending=True)
             sorted_tokens = tokens[permutation.data]
 
