@@ -177,7 +177,6 @@ def pca_transformer(factory, pca, verbose=False) -> TransformerBase:
     """
     import torch
     def _apply_pca(df):
-        # TODO: add verbose progress bar
         if verbose:
             df["doc_embs"] = df.doc_embs.progress_apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))
             df["query_embs"] = df.query_embs.progress_apply(lambda x : torch.from_numpy(pca.transform(x)).type(torch.float32))

@@ -84,12 +84,10 @@ def blacklisted_tokens_transformer(blacklist, verbose=False) -> TransformerBase:
     prune_function = _prune_gpu if torch.cuda.is_available() else _prune
 
     def _apply(df: pd.DataFrame):
-        print('Columns before: ' + df.columns)
         if verbose:
             df = df.progress_apply(prune_function, axis=1)
         else:
             df = df.apply(prune_function, axis=1)
-        print('Columns after: ' + df.columns)
         return df
 
     return pt.apply.generic(_apply)

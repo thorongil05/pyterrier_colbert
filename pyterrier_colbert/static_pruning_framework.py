@@ -76,6 +76,7 @@ class StaticPruningFramework:
             eval_metrics=self.measures,
             names=[name],
             save_dir=self.save_dir,
+            baseline=0,
             verbose=verbose
         )
         time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
@@ -85,6 +86,7 @@ class StaticPruningFramework:
         df_experiment['short-name'] = short_name
         if not notification_function is None:
             message = f'Experiment {name} completed in {time_elapsed} with a reduction of {self.index_reduction}x'
+            print(message)
             notification_function(message)
         return df_experiment
 
@@ -106,11 +108,12 @@ class StaticPruningFramework:
         )
         time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
         df_base = df_base.set_index('name')
-        df_base['% index pruning'] = self.index_pruning_percentage
-        df_base['reduction'] = self.index_reduction
+        if hasattr(self, 'index_pruning_percentage'): df_base['% index pruning'] = self.index_pruning_percentage
+        if hasattr(self, 'index_reduction'): df_base['reduction'] = self.index_reduction
         df_base['short-name'] = short_name
         if not notification_function is None:
             message = f'Experiment {name} completed in {time_elapsed} with a reduction of {self.index_reduction}x'
+            print(message)
             notification_function(message)
         return df_base
 
@@ -167,7 +170,7 @@ class StaticPruningFramework:
                 else:
                     warn("empty run did not have doc_toks column; available columns: %s" % str(run.columns))
                 return 0
-            return run['doc_toks'].apply(lambda row: row.shape[0]).mean()
+            return run['doc_toks'].apply(lambda row: row.nonzero().shape[0]).mean()
         
         AvgDocLen = ir_measures.define_byquery(
             _avg_doc_len, 
@@ -246,6 +249,41 @@ class StaticPruningFramework:
         
         return pt.apply.generic(_apply)
 
+    def remove_embeddings_common_ref(self, k, nn=5, p=2, verbose=True) -> TransformerBase:
+        """
+        Removes the embeddings which are supposed to be meaningless
+        k : number of elements to remove
+        nn : nearest neighbors to consider
+        p : distance (p = 2 is the euclidean distance)
+        """
+
+        def _prune(row):
+            tokens = row['doc_toks'].cuda()
+            embeddings = row['doc_embs'].cuda()
+            row_embs_size = embeddings.size()
+            tokens_size = tokens.size()[0]
+
+            avg_embedding = embeddings.mean(axis=0)
+            distances = torch.cdist(torch.unsqueeze(avg_embedding, 0),  embeddings).sum()
+            _, permutation = torch.sort(distances)
+            sorted_tokens = tokens[permutation.data]
+
+            mask = torch.zeros(row_embs_size[0], dtype=torch.bool)
+            mask[:tokens_size] = torch.any(tokens[None, :] == sorted_tokens[-k:, None], axis=0)
+            
+            row['doc_toks'][mask[0:tokens_size]] = 0
+            row['doc_embs'][mask, :] = 0 
+            return row
+
+        def _apply(df: pd.DataFrame):
+            if verbose:
+                df = df.progress_apply(_prune, axis=1)
+            else:
+                df = df.apply(_prune, axis=1)
+            return df
+
+        return pt.apply.generic(_apply)
+
     def blacklisted_tokens_transformer(self, blacklist, verbose=False) -> TransformerBase:
         """
         Remove tokens and their embeddings from the document dataframe
@@ -311,7 +349,7 @@ class StaticPruningFramework:
         """
         Calculates the ColBERT max_sim operator using previous encodings of queries and documents
         input: qid, query_embs, [query_weights], docno, doc_embs
-        output: ditto + score, [+ contributions]
+        output: ditto + score
         """
         import torch
         import pyterrier as pt

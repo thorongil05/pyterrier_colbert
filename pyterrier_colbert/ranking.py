@@ -162,7 +162,6 @@ class re_ranker_mmap:
             allscores.extend(batch_scores)
         return allscores
         
-        
     def our_rerank_with_embeddings(self, qembs, pids, weightsQ=None, gpu=True):
         """
         input: qid,query, docid, query_tokens, query_embeddings, query_weights 
